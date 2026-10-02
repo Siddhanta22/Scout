@@ -43,7 +43,7 @@ export function createApp({ config, db, client, now }: AppDeps) {
   const api = express.Router();
   api.use(searchRouter(client));
   api.use(organizationsRouter(orgs));
-  api.use(prospectsRouter(db, orgs, config.apiKey));
+  api.use(prospectsRouter(db, orgs, config.apiKey, config.fit));
   api.use(notFoundHandler);
   app.use("/api", api);
 

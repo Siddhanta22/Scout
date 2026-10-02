@@ -38,9 +38,10 @@ describe("Excel-friendly formatting", () => {
         name: "Habitat", ein: "030531535", status: "New", city: null, state: null,
         causeArea: null, latestTaxYear: null, latestRevenue: null, website: null, notes: "",
         savedAt: "2026-10-02T19:13:22.244Z", updatedAt: "2026-10-02T19:13:22.244Z",
+        fit: { label: "Strong fit", score: 90, reasons: [{ text: "Revenue is in range" }, { text: "Grew 20%" }] },
       },
     ]);
-    expect(out).toContain("Habitat,03-0531535,New");
+    expect(out).toContain("Habitat,03-0531535,New,Strong fit,90,Revenue is in range | Grew 20%");
     expect(out).toContain("2026-10-02 19:13:22,2026-10-02 19:13:22");
   });
 });

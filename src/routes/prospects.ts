@@ -5,6 +5,7 @@ import type { Db } from "../db.js";
 import { einSchema } from "../ein.js";
 import { AppError, asyncHandler } from "../errors.js";
 import { prospectsToCsv } from "../csv.js";
+import { scoreFit, type FitConfig } from "../fit.js";
 import type { OrgService } from "../orgService.js";
 
 export const STATUSES = ["New", "Contacted", "In conversation", "Signed", "Passed"] as const;
@@ -32,12 +33,18 @@ const listQuery = z.object({
     .transform((s) => s.toUpperCase())
     .optional(),
   cause: z.string().trim().min(1).optional(),
-  sort: z.enum(["revenue", "-revenue", "name", "-savedAt"]).default("-savedAt"),
+  sort: z.enum(["revenue", "-revenue", "name", "-savedAt", "-fit"]).default("-savedAt"),
 });
 
 type ProspectRow = NonNullable<Awaited<ReturnType<Db["prospect"]["findUnique"]>>>;
 
-function present(p: ProspectRow, latest?: { taxYear: number; totalRevenue: number | null }) {
+interface RevenueYear {
+  taxYear: number;
+  totalRevenue: number;
+}
+
+function present(p: ProspectRow, revenues: RevenueYear[], fitCfg: FitConfig) {
+  const latest = revenues[0];
   return {
     id: p.id,
     ein: p.ein,
@@ -53,10 +60,11 @@ function present(p: ProspectRow, latest?: { taxYear: number; totalRevenue: numbe
     updatedAt: p.updatedAt.toISOString(),
     latestTaxYear: latest?.taxYear ?? null,
     latestRevenue: latest?.totalRevenue ?? null,
+    fit: scoreFit({ causeArea: p.causeArea, revenues }, fitCfg),
   };
 }
 
-export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
+export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string, fitCfg: FitConfig) {
   const router = Router();
   const auth = requireApiKey(apiKey);
 
@@ -66,14 +74,31 @@ export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
     return p;
   }
 
-  async function latestFiling(ein: string) {
-    // Most recent year that actually has a revenue figure.
-    return db.filingSnapshot.findFirst({
-      where: { ein, totalRevenue: { not: null } },
+  // Years that report revenue, newest first, for each EIN. One query for the
+  // whole list; the fit trend needs the two most recent years.
+  async function revenueByEin(eins: string[]): Promise<Map<string, RevenueYear[]>> {
+    const rows = await db.filingSnapshot.findMany({
+      where: { ein: { in: eins }, totalRevenue: { not: null } },
       orderBy: { taxYear: "desc" },
-      select: { taxYear: true, totalRevenue: true },
+      select: { ein: true, taxYear: true, totalRevenue: true },
     });
+    const map = new Map<string, RevenueYear[]>();
+    for (const r of rows) {
+      const list = map.get(r.ein) ?? [];
+      list.push({ taxYear: r.taxYear, totalRevenue: r.totalRevenue as number });
+      map.set(r.ein, list);
+    }
+    return map;
   }
+
+  async function presentOne(p: ProspectRow) {
+    return present(p, (await revenueByEin([p.ein])).get(p.ein) ?? [], fitCfg);
+  }
+
+  // The settings behind every fit score, so the UI can show what "fit" means.
+  router.get("/fit/criteria", (_req, res) => {
+    res.json(fitCfg);
+  });
 
   router.post(
     "/prospects",
@@ -95,7 +120,7 @@ export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
           notes: notes ?? "",
         },
       });
-      res.status(201).json(present(created, (await latestFiling(ein)) ?? undefined));
+      res.status(201).json(await presentOne(created));
     }),
   );
 
@@ -109,15 +134,16 @@ export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
         ...(q.cause && { causeArea: { equals: q.cause } }),
       },
     });
-    const items = await Promise.all(
-      rows.map(async (p) => present(p, (await latestFiling(p.ein)) ?? undefined)),
-    );
+    const revenues = await revenueByEin(rows.map((p) => p.ein));
+    const items = rows.map((p) => present(p, revenues.get(p.ein) ?? [], fitCfg));
     items.sort((a, b) => {
       switch (q.sort) {
         case "name":
           return a.name.localeCompare(b.name);
         case "-savedAt":
           return b.savedAt.localeCompare(a.savedAt);
+        case "-fit":
+          return b.fit.score - a.fit.score || a.name.localeCompare(b.name);
         default: {
           // Prospects without revenue data always sort last.
           const dir = q.sort === "revenue" ? 1 : -1;
@@ -165,7 +191,7 @@ export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
           ...(body.website !== undefined && { website: body.website || null }),
         },
       });
-      res.json(present(updated, (await latestFiling(updated.ein)) ?? undefined));
+      res.json(await presentOne(updated));
     }),
   );
 

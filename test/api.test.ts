@@ -190,12 +190,13 @@ describe("CSV export", () => {
     expect(all.headers["content-disposition"]).toContain("scout-shortlist.csv");
     const lines = all.text.replace("\uFEFF", "").trim().split("\r\n");
     expect(lines[0]).toBe(
-      "Name,EIN,Status,City,State,Cause area,Latest tax year,Latest revenue,Website,Notes,Saved at,Updated at",
+      "Name,EIN,Status,Fit,Fit score,Fit reasons,City,State,Cause area,Latest tax year,Latest revenue,Website,Notes,Saved at,Updated at",
     );
     expect(lines).toHaveLength(3);
     // timestamps are "YYYY-MM-DD HH:MM:SS" so spreadsheets parse them as dates
+    expect(lines[1]).toContain(",Austin,TX,Human Services,2023,2000000,");
     expect(lines[1]).toMatch(/,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
-    expect(lines[1]).toContain("Helping Hands,12-3456789,Contacted,Austin,TX,Human Services,2023,2000000");
+    expect(lines[1]).toContain("Helping Hands,12-3456789,Contacted,Strong fit,100,");
     expect(lines[1]).toContain('"Call ""Sam"", then =cmd"');
 
     const filtered = await request(app).get("/api/prospects/export.csv").query({ status: "New" });
@@ -220,5 +221,45 @@ describe("dev key prefill", () => {
     const r = await request(app).get("/api/dev-key"); // supertest connects via 127.0.0.1
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ apiKey: API_KEY });
+  });
+});
+
+describe("fit score", () => {
+  it("is returned on prospects with reasons, and the criteria are exposed", async () => {
+    const { app } = build();
+    const saved = await request(app).post("/api/prospects").set(auth).send({ ein: EIN });
+    // 2M revenue is in the $250K-$5M band, and 2023 vs 2022 is +33%
+    expect(saved.body.fit).toMatchObject({ score: 100, label: "Strong fit" });
+    expect(saved.body.fit.reasons.map((r: any) => r.criterion)).toEqual(["size", "trend"]);
+    expect(saved.body.fit.reasons[1].text).toBe("Revenue grew 33% from 2022 to 2023");
+
+    const criteria = await request(app).get("/api/fit/criteria");
+    expect(criteria.body).toEqual(testConfig.fit);
+  });
+
+  it("scores cause match when targets are configured, and sorts best fit first", async () => {
+    const fake = fakeClient({
+      [EIN]: makeOrg(EIN), // Human Services, in band, growing
+      [EIN2]: makeOrg(EIN2, { name: "Zeta Arts", nteeCode: "A20" }), // Arts
+    });
+    const config = { ...testConfig, fit: { ...testConfig.fit, targetCauses: ["Arts, Culture & Humanities"] } };
+    const app = createApp({ config, db, client: fake.client });
+    for (const ein of [EIN, EIN2]) await request(app).post("/api/prospects").set(auth).send({ ein });
+
+    const list = await request(app).get("/api/prospects").query({ sort: "-fit" });
+    expect(list.body.prospects.map((p: any) => [p.name, p.fit.score])).toEqual([
+      ["Zeta Arts", 100],
+      ["Helping Hands", 70], // 70 of 100: cause doesn't match
+    ]);
+    const hh = list.body.prospects[1].fit.reasons.find((r: any) => r.criterion === "cause");
+    expect(hh.text).toContain("is not one of your targets");
+  });
+
+  it("flags prospects with no financials as Not enough data", async () => {
+    const fake = fakeClient({ [EIN]: { ...makeOrg(EIN), filings: [] } });
+    const app = createApp({ config: testConfig, db, client: fake.client });
+    const saved = await request(app).post("/api/prospects").set(auth).send({ ein: EIN });
+    expect(saved.body.fit.label).toBe("Not enough data");
+    expect(saved.body.latestRevenue).toBeNull();
   });
 });

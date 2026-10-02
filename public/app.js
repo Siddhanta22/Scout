@@ -237,6 +237,13 @@ function prospectCard(p) {
   notes.value = p.notes;
   const saveBtn = h("button", {}, "Save changes");
   const trend = h("div", { class: "trend", hidden: true });
+  const why = h("div", { class: "why", hidden: true },
+    h("ul", {}, p.fit.reasons.map((r) =>
+      h("li", {},
+        h("span", { class: "pts " + (r.points === r.max ? "full" : r.points === 0 ? "zero" : "") }, `${r.points}/${r.max}`),
+        h("span", {}, r.text)))));
+  const fitBadge = h("span", { class: "fit f-" + p.fit.label.replace(/ /g, "-"), title: "Score " + p.fit.score + "/100" }, p.fit.label, " · ", p.fit.score);
+  const whyBtn = h("button", { onclick: () => (why.hidden = !why.hidden) }, "Why this fit?");
 
   saveBtn.onclick = async () => {
     saveBtn.disabled = true;
@@ -277,11 +284,12 @@ function prospectCard(p) {
   return h("div", { class: "card" },
     h("div", { class: "row" },
       h("div", {},
-        h("div", { class: "name" }, p.name, " ", badge),
+        h("div", { class: "name" }, p.name, " ", badge, " ", fitBadge),
         h("div", { class: "meta" }, [p.city, p.state].filter(Boolean).join(", ") || "Location unknown", " · ", p.causeArea || "Cause unknown", " · EIN ", p.ein)),
       h("div", { class: "nums" }, h("div", {}, `Revenue${p.latestTaxYear ? " (" + p.latestTaxYear + ")" : ""}`, h("b", {}, money(p.latestRevenue))))),
     notes,
-    h("div", { class: "actions" }, select, saveBtn, trendBtn, del),
+    h("div", { class: "actions" }, select, saveBtn, whyBtn, trendBtn, del),
+    why,
     trend);
 }
 
@@ -298,6 +306,12 @@ for (const id of ["fStatus", "fState", "fCause", "fSort"]) $(id).addEventListene
     }
     const list = await api("/prospects");
     $("count").textContent = list.total;
+    const f = await api("/fit/criteria");
+    const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(n);
+    $("fitCriteria").textContent =
+      `Fit scoring: revenue ${money(f.minRevenue)}–${money(f.maxRevenue)} · ` +
+      (f.targetCauses.length ? `causes: ${f.targetCauses.join(", ")}` : "any cause") +
+      " · change in .env (FIT_MIN_REVENUE, FIT_MAX_REVENUE, FIT_TARGET_CAUSES)";
   } catch (e) {
     $("searchMsg").className = "msg error";
     $("searchMsg").textContent = e.message;

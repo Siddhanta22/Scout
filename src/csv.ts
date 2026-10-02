@@ -1,29 +1,20 @@
-const COLUMNS = [
-  ["name", "Name"],
-  ["ein", "EIN"],
-  ["status", "Status"],
-  ["city", "City"],
-  ["state", "State"],
-  ["causeArea", "Cause area"],
-  ["latestTaxYear", "Latest tax year"],
-  ["latestRevenue", "Latest revenue"],
-  ["website", "Website"],
-  ["notes", "Notes"],
-  ["savedAt", "Saved at"],
-  ["updatedAt", "Updated at"],
-] as const;
-
-type Row = Record<(typeof COLUMNS)[number][0], string | number | null>;
-
-// RFC 4180 quoting, plus defence against spreadsheet formula injection: notes
-// and org names are user/external text, so a cell starting with = + - @ would
-// otherwise be evaluated when opened in Excel or Sheets.
-export function csvCell(value: string | number | null): string {
-  if (value === null || value === undefined) return "";
-  let s = String(value);
-  if (typeof value === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+export interface ProspectCsvRow {
+  name: string;
+  ein: string;
+  status: string;
+  city: string | null;
+  state: string | null;
+  causeArea: string | null;
+  latestTaxYear: number | null;
+  latestRevenue: number | null;
+  website: string | null;
+  notes: string;
+  savedAt: string;
+  updatedAt: string;
+  fit: { label: string; score: number; reasons: { text: string }[] };
 }
+
+type Cell = string | number | null;
 
 // Excel turns a bare 9-digit EIN into a number and drops leading zeros
 // (030531535 -> 30531535). The IRS display form NN-NNNNNNN stays text.
@@ -33,17 +24,38 @@ const formatEin = (ein: string) => (/^\d{9}$/.test(ein) ? `${ein.slice(0, 2)}-${
 // is parsed as a real date-time so the column sorts.
 const formatTimestamp = (iso: string) => iso.replace("T", " ").replace(/\.\d+Z$/, "");
 
-function display(key: (typeof COLUMNS)[number][0], value: string | number | null) {
-  if (typeof value !== "string") return value;
-  if (key === "ein") return formatEin(value);
-  if (key === "savedAt" || key === "updatedAt") return formatTimestamp(value);
-  return value;
+const COLUMNS: [label: string, get: (r: ProspectCsvRow) => Cell][] = [
+  ["Name", (r) => r.name],
+  ["EIN", (r) => formatEin(r.ein)],
+  ["Status", (r) => r.status],
+  ["Fit", (r) => r.fit.label],
+  ["Fit score", (r) => r.fit.score],
+  ["Fit reasons", (r) => r.fit.reasons.map((x) => x.text).join(" | ")],
+  ["City", (r) => r.city],
+  ["State", (r) => r.state],
+  ["Cause area", (r) => r.causeArea],
+  ["Latest tax year", (r) => r.latestTaxYear],
+  ["Latest revenue", (r) => r.latestRevenue],
+  ["Website", (r) => r.website],
+  ["Notes", (r) => r.notes],
+  ["Saved at", (r) => formatTimestamp(r.savedAt)],
+  ["Updated at", (r) => formatTimestamp(r.updatedAt)],
+];
+
+// RFC 4180 quoting, plus defence against spreadsheet formula injection: notes
+// and org names are user/external text, so a cell starting with = + - @ would
+// otherwise be evaluated when opened in Excel or Sheets.
+export function csvCell(value: Cell): string {
+  if (value === null || value === undefined) return "";
+  let s = String(value);
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function prospectsToCsv(rows: Row[]): string {
+export function prospectsToCsv(rows: ProspectCsvRow[]): string {
   const lines = [
-    COLUMNS.map(([, label]) => label).join(","),
-    ...rows.map((r) => COLUMNS.map(([key]) => csvCell(display(key, r[key]))).join(",")),
+    COLUMNS.map(([label]) => label).join(","),
+    ...rows.map((r) => COLUMNS.map(([, get]) => csvCell(get(r))).join(",")),
   ];
   // BOM so Excel opens UTF-8 (accented names) correctly.
   return "﻿" + lines.join("\r\n") + "\r\n";

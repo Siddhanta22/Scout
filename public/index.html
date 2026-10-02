@@ -41,12 +41,14 @@
       <select id="fCause"><option value="">Any cause area</option></select>
       <select id="fSort">
         <option value="-savedAt">Newest saved</option>
+        <option value="-fit">Best fit</option>
         <option value="-revenue">Revenue: high to low</option>
         <option value="revenue">Revenue: low to high</option>
         <option value="name">Name</option>
       </select>
       <a id="exportLink" class="btn" href="/api/prospects/export.csv" download>Export CSV</a>
     </div>
+    <div id="fitCriteria" class="meta criteria"></div>
     <div id="shortlistMsg" class="msg"></div>
     <div id="prospects"></div>
   </main>

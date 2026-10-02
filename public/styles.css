@@ -55,3 +55,15 @@ textarea { width: 100%; min-height: 54px; resize: vertical; margin-top: 6px; }
 #toast.error { background: var(--danger); }
 a.btn { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); text-decoration: none; margin-left: auto; }
 a.btn:hover { border-color: var(--accent); color: var(--accent); }
+.criteria { margin: 0 0 8px; }
+.fit { font-size: 12px; font-weight: 600; border-radius: 10px; padding: 2px 9px; border: 1px solid transparent; }
+.f-Strong-fit { background: #d6efdf; color: #1e6b3d; }
+.f-Possible-fit { background: #fbeccd; color: #8a5a00; }
+.f-Weak-fit { background: #f5dcdc; color: #9a3030; }
+.f-Not-enough-data { background: #e8ecef; color: #4b5864; }
+.why { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.why ul { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.why li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.why .pts { font: 600 11px ui-monospace, monospace; color: var(--muted); min-width: 44px; }
+.why .pts.full { color: #1e6b3d; }
+.why .pts.zero { color: var(--danger); }

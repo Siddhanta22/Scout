@@ -28,6 +28,8 @@ Production: `npm run build && npm start`.
 | `DATABASE_URL` | yes | `file:./dev.db` (in `.env.example`) | SQLite file. Relative paths resolve from `prisma/`. |
 | `PORT` | no | `3000` | HTTP port. |
 | `FILING_TTL_DAYS` | no | `30` | How long cached filings are served before refetching. |
+| `FIT_MIN_REVENUE` / `FIT_MAX_REVENUE` | no | `250000` / `5000000` | Target revenue band (dollars) for the fit score. |
+| `FIT_TARGET_CAUSES` | no | any | Comma-separated cause areas your club targets, e.g. `Education,Health`. Invalid names stop the server at startup. |
 | `SCOUT_DEV_PREFILL` | no | off (`true` in `.env.example`) | Local convenience: the dashboard pre-fills the API key. The server only reveals it to connections from the same machine, and only when this is `true`. **Turn it off for any deployed instance**, especially behind a reverse proxy, where every request looks local. |
 | `PROPUBLICA_BASE_URL` | no | ProPublica v2 API | Override for testing. |
 
@@ -49,13 +51,28 @@ JSON under `/api`. Errors are always `{ "error": { "code", "message", "details?"
 | GET | `/api/causes` | no | Cause-area ids and names. |
 | GET | `/api/organizations/:ein` | no | Org plus all filing years. Cache-first (see below). EIN may be `53-0196605` or `530196605`. |
 | POST | `/api/prospects` | yes | `{ein, notes?}`. Saves with status `New`. 409 if already saved. |
-| GET | `/api/prospects?status=&state=&cause=&sort=` | no | `cause` is the cause-area name (e.g. `Human Services`). `sort` is `-savedAt` (default), `revenue`, `-revenue` or `name`. Prospects without revenue data sort last. |
+| GET | `/api/prospects?status=&state=&cause=&sort=` | no | `cause` is the cause-area name (e.g. `Human Services`). `sort` is `-savedAt` (default), `-fit`, `revenue`, `-revenue` or `name`. Each prospect includes a `fit` object (see Fit score). Prospects without revenue data sort last. |
+| GET | `/api/fit/criteria` | no | The revenue band and target causes behind every fit score. |
 | GET | `/api/prospects/export.csv` | no | Same filters and sort as the list, downloaded as `scout-shortlist.csv`. Opens cleanly in Excel/Sheets: UTF-8 BOM, EINs written as `NN-NNNNNNN` so leading zeros survive, timestamps as `YYYY-MM-DD HH:MM:SS` (UTC). Cells beginning with `= + - @` are prefixed with `'` so notes can't run as spreadsheet formulas. |
 | PATCH | `/api/prospects/:id` | yes | `{status?, notes?, website?}`. |
 | GET | `/api/prospects/:id/history` | no | Revenue/expense/asset trend, oldest to newest. |
 | DELETE | `/api/prospects/:id` | yes | 204. |
 
 Statuses: `New`, `Contacted`, `In conversation`, `Signed`, `Passed`. Any status can move to any other, because a person decides.
+
+## Fit score
+
+Each prospect gets a 0-100 score, a label (`Strong fit` 75+, `Possible fit` 45-74, `Weak fit`, or `Not enough data` when no revenue is on file) and a list of reasons. It's a transparent heuristic, not a model: every point traces to a stated criterion.
+
+| Criterion | Points | Rule |
+|---|---|---|
+| Size | 40 | Latest revenue inside your band = 40; within 2x of either edge = 20; otherwise 0 (too small: no budget; too large: has its own consultants). |
+| Cause | 30 | In `FIT_TARGET_CAUSES` = 30. **Only scored if you set targets**; otherwise omitted and the rest rescales to 100. |
+| Trend | 30 | Latest vs previous year with revenue: growth or within -10% = 30; down 10-30% = 15; worse = 0. One year of data = 0, labelled "unknown". |
+
+The dashboard shows a badge with a "Why this fit?" panel listing each criterion's points and reason. The same reasons are in the API and the CSV. The thresholds are my defaults for a typical student club (a budget big enough to matter, small enough not to have consultants). Set your own in `.env`. The logic is a pure function in `src/fit.ts`.
+
+Missing data counts against a prospect (it earns no points) but is always stated in the reasons, so "weak" never silently means "unknown".
 
 ## Design decisions
 
@@ -77,7 +94,7 @@ Statuses: `New`, `Contacted`, `In conversation`, `Signed`, `Passed`. Any status 
 
 ## Testing
 
-`npm test` runs 31 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
+`npm test` runs 49 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
 
 - Unit: cache hit within TTL, refetch after TTL, stale-on-error, unknown EIN not cached.
 - Client: param mapping, missing fields, de-duplicated years, 404, 429 with `Retry-After`, backoff, timeout and bad JSON mapping.
@@ -87,7 +104,8 @@ Tests use a fake ProPublica client, so they're fast and don't hit the network.
 
 ## Known limitations / what I'd do next
 
-- **Stretch goals not built:** geocoding/map, fit score, outreach drafts (CSV export is done). I prioritized a solid, tested core.
+- **Stretch goals not built:** geocoding/map and outreach drafts (CSV export and fit score are done).
+- **The fit score is simple on purpose.** It uses only revenue, cause and one year-over-year change. It ignores expense ratio, assets and filing history, and its weights (40/30/30) are my judgment calls, not tuned on outcomes. I prioritized a solid, tested core.
 - **Search is not cached.** Fine at club scale. A short in-memory TTL cache would cut repeat queries.
 - **Shortlist sort/filter by revenue happens in memory** after one DB query per prospect for the latest revenue. That's fine for hundreds of prospects, but would want a join or denormalized column beyond that.
 - **Stale data isn't refreshed in the background.** The cache refreshes lazily on the next request after the TTL.

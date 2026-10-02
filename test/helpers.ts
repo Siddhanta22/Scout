@@ -9,6 +9,7 @@ export const testConfig: Config = {
   filingTtlMs: 30 * 24 * 60 * 60 * 1000,
   propublicaBaseUrl: "http://upstream.invalid",
   devPrefillKey: false,
+  fit: { minRevenue: 250_000, maxRevenue: 5_000_000, targetCauses: [] },
 };
 
 export function makeOrg(ein: string, overrides: Partial<OrgDetail["organization"]> = {}): OrgDetail {
