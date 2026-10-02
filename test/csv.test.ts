@@ -30,3 +30,17 @@ describe("prospectsToCsv", () => {
     expect(out.endsWith("\r\n")).toBe(true);
   });
 });
+
+describe("Excel-friendly formatting", () => {
+  it("keeps leading zeros by dashing the EIN, and formats timestamps", () => {
+    const out = prospectsToCsv([
+      {
+        name: "Habitat", ein: "030531535", status: "New", city: null, state: null,
+        causeArea: null, latestTaxYear: null, latestRevenue: null, website: null, notes: "",
+        savedAt: "2026-10-02T19:13:22.244Z", updatedAt: "2026-10-02T19:13:22.244Z",
+      },
+    ]);
+    expect(out).toContain("Habitat,03-0531535,New");
+    expect(out).toContain("2026-10-02 19:13:22,2026-10-02 19:13:22");
+  });
+});

@@ -193,7 +193,9 @@ describe("CSV export", () => {
       "Name,EIN,Status,City,State,Cause area,Latest tax year,Latest revenue,Website,Notes,Saved at,Updated at",
     );
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toContain("Helping Hands,123456789,Contacted,Austin,TX,Human Services,2023,2000000");
+    // timestamps are "YYYY-MM-DD HH:MM:SS" so spreadsheets parse them as dates
+    expect(lines[1]).toMatch(/,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+    expect(lines[1]).toContain("Helping Hands,12-3456789,Contacted,Austin,TX,Human Services,2023,2000000");
     expect(lines[1]).toContain('"Call ""Sam"", then =cmd"');
 
     const filtered = await request(app).get("/api/prospects/export.csv").query({ status: "New" });

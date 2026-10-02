@@ -25,10 +25,25 @@ export function csvCell(value: string | number | null): string {
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+// Excel turns a bare 9-digit EIN into a number and drops leading zeros
+// (030531535 -> 30531535). The IRS display form NN-NNNNNNN stays text.
+const formatEin = (ein: string) => (/^\d{9}$/.test(ein) ? `${ein.slice(0, 2)}-${ein.slice(2)}` : ein);
+
+// ISO "2026-10-02T19:13:22.244Z" stays text in Excel; "2026-10-02 19:13:22" (UTC)
+// is parsed as a real date-time so the column sorts.
+const formatTimestamp = (iso: string) => iso.replace("T", " ").replace(/\.\d+Z$/, "");
+
+function display(key: (typeof COLUMNS)[number][0], value: string | number | null) {
+  if (typeof value !== "string") return value;
+  if (key === "ein") return formatEin(value);
+  if (key === "savedAt" || key === "updatedAt") return formatTimestamp(value);
+  return value;
+}
+
 export function prospectsToCsv(rows: Row[]): string {
   const lines = [
     COLUMNS.map(([, label]) => label).join(","),
-    ...rows.map((r) => COLUMNS.map(([key]) => csvCell(r[key])).join(",")),
+    ...rows.map((r) => COLUMNS.map(([key]) => csvCell(display(key, r[key]))).join(",")),
   ];
   // BOM so Excel opens UTF-8 (accented names) correctly.
   return "﻿" + lines.join("\r\n") + "\r\n";

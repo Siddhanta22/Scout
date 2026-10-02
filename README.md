@@ -50,7 +50,7 @@ JSON under `/api`. Errors are always `{ "error": { "code", "message", "details?"
 | GET | `/api/organizations/:ein` | no | Org plus all filing years. Cache-first (see below). EIN may be `53-0196605` or `530196605`. |
 | POST | `/api/prospects` | yes | `{ein, notes?}`. Saves with status `New`. 409 if already saved. |
 | GET | `/api/prospects?status=&state=&cause=&sort=` | no | `cause` is the cause-area name (e.g. `Human Services`). `sort` is `-savedAt` (default), `revenue`, `-revenue` or `name`. Prospects without revenue data sort last. |
-| GET | `/api/prospects/export.csv` | no | Same filters and sort as the list, downloaded as `scout-shortlist.csv`. Opens cleanly in Excel/Sheets (UTF-8 BOM). Cells beginning with `= + - @` are prefixed with `'` so notes can't run as spreadsheet formulas. |
+| GET | `/api/prospects/export.csv` | no | Same filters and sort as the list, downloaded as `scout-shortlist.csv`. Opens cleanly in Excel/Sheets: UTF-8 BOM, EINs written as `NN-NNNNNNN` so leading zeros survive, timestamps as `YYYY-MM-DD HH:MM:SS` (UTC). Cells beginning with `= + - @` are prefixed with `'` so notes can't run as spreadsheet formulas. |
 | PATCH | `/api/prospects/:id` | yes | `{status?, notes?, website?}`. |
 | GET | `/api/prospects/:id/history` | no | Revenue/expense/asset trend, oldest to newest. |
 | DELETE | `/api/prospects/:id` | yes | 204. |
@@ -77,7 +77,7 @@ Statuses: `New`, `Contacted`, `In conversation`, `Signed`, `Passed`. Any status 
 
 ## Testing
 
-`npm test` runs 30 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
+`npm test` runs 31 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
 
 - Unit: cache hit within TTL, refetch after TTL, stale-on-error, unknown EIN not cached.
 - Client: param mapping, missing fields, de-duplicated years, 404, 429 with `Retry-After`, backoff, timeout and bad JSON mapping.
