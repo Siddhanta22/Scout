@@ -9,7 +9,7 @@ Stack: TypeScript, Express 5, Prisma + SQLite, Vitest + Supertest, vanilla HTML/
 Requires Node 20+.
 
 ```bash
-git clone <this repo> scout && cd scout
+git clone https://github.com/Siddhanta22/Scout.git && cd Scout
 npm install
 cp .env.example .env        # then set SCOUT_API_KEY to something secret
 npx prisma migrate deploy   # creates dev.db
