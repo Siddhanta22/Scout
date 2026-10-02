@@ -2,6 +2,8 @@ export interface Config {
   apiKey: string;
   filingTtlMs: number;
   propublicaBaseUrl: string;
+  /** Local convenience: let the dashboard fetch the key from loopback clients. */
+  devPrefillKey: boolean;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -21,5 +23,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     propublicaBaseUrl:
       env.PROPUBLICA_BASE_URL ??
       "https://projects.propublica.org/nonprofits/api/v2",
+    devPrefillKey: env.SCOUT_DEV_PREFILL === "true",
   };
 }

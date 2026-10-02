@@ -8,6 +8,7 @@ export const testConfig: Config = {
   apiKey: API_KEY,
   filingTtlMs: 30 * 24 * 60 * 60 * 1000,
   propublicaBaseUrl: "http://upstream.invalid",
+  devPrefillKey: false,
 };
 
 export function makeOrg(ein: string, overrides: Partial<OrgDetail["organization"]> = {}): OrgDetail {

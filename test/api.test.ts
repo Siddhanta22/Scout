@@ -203,3 +203,20 @@ describe("CSV export", () => {
     expect((await request(app).get("/api/prospects/export.csv").query({ status: "Bogus" })).status).toBe(400);
   });
 });
+
+describe("dev key prefill", () => {
+  it("is a 404 unless explicitly enabled", async () => {
+    const { app } = build();
+    const r = await request(app).get("/api/dev-key");
+    expect(r.status).toBe(404);
+    expect(JSON.stringify(r.body)).not.toContain(API_KEY);
+  });
+
+  it("returns the key to loopback clients when enabled", async () => {
+    const fake = fakeClient();
+    const app = createApp({ config: { ...testConfig, devPrefillKey: true }, db, client: fake.client });
+    const r = await request(app).get("/api/dev-key"); // supertest connects via 127.0.0.1
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ apiKey: API_KEY });
+  });
+});

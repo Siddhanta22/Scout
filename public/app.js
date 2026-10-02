@@ -52,6 +52,17 @@ async function api(path, { method = "GET", body, auth = false } = {}) {
 
 // --- API key persistence (browser only) ---
 $("apiKey").value = localStorage.getItem("scoutKey") || "";
+// Local-only convenience: the server returns the key only when started with
+// SCOUT_DEV_PREFILL=true and the request is from this machine. A 404 just
+// means "not enabled", so fall back to the manual box silently.
+if (!$("apiKey").value) {
+  fetch("/api/dev-key")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (d?.apiKey && !$("apiKey").value) $("apiKey").value = d.apiKey;
+    })
+    .catch(() => {});
+}
 $("apiKey").addEventListener("change", () => localStorage.setItem("scoutKey", $("apiKey").value.trim()));
 
 // --- tabs ---

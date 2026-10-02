@@ -16,7 +16,7 @@ npx prisma migrate deploy   # creates dev.db
 npm run dev                 # http://localhost:3000
 ```
 
-Open http://localhost:3000. Paste your `SCOUT_API_KEY` into the key box at the top (stored in your browser only) to save or edit prospects. Searching and browsing need no key.
+Open http://localhost:3000. With `SCOUT_DEV_PREFILL=true` (the default in `.env.example`) the key box fills itself in locally. Otherwise paste your `SCOUT_API_KEY` into it (stored in your browser only) to save or edit prospects. Searching and browsing need no key.
 
 Production: `npm run build && npm start`.
 
@@ -28,6 +28,7 @@ Production: `npm run build && npm start`.
 | `DATABASE_URL` | yes | `file:./dev.db` (in `.env.example`) | SQLite file. Relative paths resolve from `prisma/`. |
 | `PORT` | no | `3000` | HTTP port. |
 | `FILING_TTL_DAYS` | no | `30` | How long cached filings are served before refetching. |
+| `SCOUT_DEV_PREFILL` | no | off (`true` in `.env.example`) | Local convenience: the dashboard pre-fills the API key. The server only reveals it to connections from the same machine, and only when this is `true`. **Turn it off for any deployed instance**, especially behind a reverse proxy, where every request looks local. |
 | `PROPUBLICA_BASE_URL` | no | ProPublica v2 API | Override for testing. |
 
 ### Scripts
@@ -76,7 +77,7 @@ Statuses: `New`, `Contacted`, `In conversation`, `Signed`, `Passed`. Any status 
 
 ## Testing
 
-`npm test` runs 28 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
+`npm test` runs 30 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
 
 - Unit: cache hit within TTL, refetch after TTL, stale-on-error, unknown EIN not cached.
 - Client: param mapping, missing fields, de-duplicated years, 404, 429 with `Retry-After`, backoff, timeout and bad JSON mapping.
