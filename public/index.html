@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scout — nonprofit prospecting</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Scout</h1>
+    <p class="tag">Find and track nonprofit prospects from public IRS 990 data</p>
+    <label class="key">
+      API key (for saving)
+      <input id="apiKey" type="password" placeholder="X-API-Key" autocomplete="off" />
+    </label>
+  </header>
+
+  <nav>
+    <button id="tab-search" class="active">Search</button>
+    <button id="tab-shortlist">Shortlist <span id="count" class="pill">0</span></button>
+  </nav>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <main id="view-search">
+    <form id="searchForm" class="filters">
+      <input id="q" placeholder="Name or keyword" />
+      <input id="state" placeholder="State (e.g. TX)" maxlength="2" />
+      <select id="cause"><option value="">Any cause area</option></select>
+      <button type="submit">Search</button>
+    </form>
+    <div id="searchMsg" class="msg"></div>
+    <div id="results"></div>
+    <div id="pager" class="pager"></div>
+  </main>
+
+  <main id="view-shortlist" hidden>
+    <div class="filters">
+      <select id="fStatus"><option value="">Any status</option></select>
+      <input id="fState" placeholder="State" maxlength="2" />
+      <select id="fCause"><option value="">Any cause area</option></select>
+      <select id="fSort">
+        <option value="-savedAt">Newest saved</option>
+        <option value="-revenue">Revenue: high to low</option>
+        <option value="revenue">Revenue: low to high</option>
+        <option value="name">Name</option>
+      </select>
+    </div>
+    <div id="shortlistMsg" class="msg"></div>
+    <div id="prospects"></div>
+  </main>
+
+  <footer>
+    Data: IRS Form 990 via the
+    <a href="https://projects.propublica.org/nonprofits/api" target="_blank" rel="noopener">ProPublica Nonprofit Explorer API</a>.
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>
