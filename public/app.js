@@ -204,6 +204,8 @@ async function loadShortlist() {
   if ($("fState").value.trim()) p.set("state", $("fState").value.trim());
   if ($("fCause").value) p.set("cause", $("fCause").value);
   p.set("sort", $("fSort").value);
+  // Export exactly what the filters are showing.
+  $("exportLink").href = "/api/prospects/export.csv?" + p;
   const msg = $("shortlistMsg");
   msg.className = "msg";
   try {

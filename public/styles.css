@@ -53,3 +53,5 @@ textarea { width: 100%; min-height: 54px; resize: vertical; margin-top: 6px; }
 #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 #toast.show { opacity: 1; }
 #toast.error { background: var(--danger); }
+a.btn { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); text-decoration: none; margin-left: auto; }
+a.btn:hover { border-color: var(--accent); color: var(--accent); }

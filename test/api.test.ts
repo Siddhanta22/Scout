@@ -176,3 +176,30 @@ describe("prospect list filters and sorting", () => {
     expect(await names({ sort: "revenue" })).toEqual(["Helping Hands", "Zeta Arts", "No Numbers"]);
   });
 });
+
+describe("CSV export", () => {
+  it("exports the filtered shortlist as CSV, with no auth needed", async () => {
+    const { app } = build();
+    const a = await request(app).post("/api/prospects").set(auth).send({ ein: EIN, notes: 'Call "Sam", then =cmd' });
+    await request(app).post("/api/prospects").set(auth).send({ ein: EIN2 });
+    await request(app).patch(`/api/prospects/${a.body.id}`).set(auth).send({ status: "Contacted" });
+
+    const all = await request(app).get("/api/prospects/export.csv").query({ sort: "name" });
+    expect(all.status).toBe(200);
+    expect(all.headers["content-type"]).toContain("text/csv");
+    expect(all.headers["content-disposition"]).toContain("scout-shortlist.csv");
+    const lines = all.text.replace("\uFEFF", "").trim().split("\r\n");
+    expect(lines[0]).toBe(
+      "Name,EIN,Status,City,State,Cause area,Latest tax year,Latest revenue,Website,Notes,Saved at,Updated at",
+    );
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toContain("Helping Hands,123456789,Contacted,Austin,TX,Human Services,2023,2000000");
+    expect(lines[1]).toContain('"Call ""Sam"", then =cmd"');
+
+    const filtered = await request(app).get("/api/prospects/export.csv").query({ status: "New" });
+    expect(filtered.text).toContain("Zeta Arts");
+    expect(filtered.text).not.toContain("Helping Hands");
+
+    expect((await request(app).get("/api/prospects/export.csv").query({ status: "Bogus" })).status).toBe(400);
+  });
+});

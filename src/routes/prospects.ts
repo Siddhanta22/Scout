@@ -4,6 +4,7 @@ import { requireApiKey } from "../auth.js";
 import type { Db } from "../db.js";
 import { einSchema } from "../ein.js";
 import { AppError, asyncHandler } from "../errors.js";
+import { prospectsToCsv } from "../csv.js";
 import type { OrgService } from "../orgService.js";
 
 export const STATUSES = ["New", "Contacted", "In conversation", "Signed", "Passed"] as const;
@@ -98,38 +99,55 @@ export function prospectsRouter(db: Db, orgs: OrgService, apiKey: string) {
     }),
   );
 
+  async function listProspects(query: unknown) {
+    const q = listQuery.parse(query);
+    const rows = await db.prospect.findMany({
+      where: {
+        ...(q.status && { status: q.status }),
+        ...(q.state && { state: q.state }),
+        // exact match against the derived cause area name (e.g. "Human Services")
+        ...(q.cause && { causeArea: { equals: q.cause } }),
+      },
+    });
+    const items = await Promise.all(
+      rows.map(async (p) => present(p, (await latestFiling(p.ein)) ?? undefined)),
+    );
+    items.sort((a, b) => {
+      switch (q.sort) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "-savedAt":
+          return b.savedAt.localeCompare(a.savedAt);
+        default: {
+          // Prospects without revenue data always sort last.
+          const dir = q.sort === "revenue" ? 1 : -1;
+          if (a.latestRevenue === null && b.latestRevenue === null) return 0;
+          if (a.latestRevenue === null) return 1;
+          if (b.latestRevenue === null) return -1;
+          return dir * (a.latestRevenue - b.latestRevenue);
+        }
+      }
+    });
+    return items;
+  }
+
   router.get(
     "/prospects",
     asyncHandler(async (req, res) => {
-      const q = listQuery.parse(req.query);
-      const rows = await db.prospect.findMany({
-        where: {
-          ...(q.status && { status: q.status }),
-          ...(q.state && { state: q.state }),
-          // exact match against the derived cause area name (e.g. "Human Services")
-          ...(q.cause && { causeArea: { equals: q.cause } }),
-        },
-      });
-      const items = await Promise.all(
-        rows.map(async (p) => present(p, (await latestFiling(p.ein)) ?? undefined)),
-      );
-      items.sort((a, b) => {
-        switch (q.sort) {
-          case "name":
-            return a.name.localeCompare(b.name);
-          case "-savedAt":
-            return b.savedAt.localeCompare(a.savedAt);
-          default: {
-            // Prospects without revenue data always sort last.
-            const dir = q.sort === "revenue" ? 1 : -1;
-            if (a.latestRevenue === null && b.latestRevenue === null) return 0;
-            if (a.latestRevenue === null) return 1;
-            if (b.latestRevenue === null) return -1;
-            return dir * (a.latestRevenue - b.latestRevenue);
-          }
-        }
-      });
+      const items = await listProspects(req.query);
       res.json({ total: items.length, prospects: items });
+    }),
+  );
+
+  // Same filters and sort as the list, so "export what I'm looking at" works.
+  router.get(
+    "/prospects/export.csv",
+    asyncHandler(async (req, res) => {
+      const items = await listProspects(req.query);
+      res
+        .type("text/csv; charset=utf-8")
+        .set("Content-Disposition", 'attachment; filename="scout-shortlist.csv"')
+        .send(prospectsToCsv(items));
     }),
   );
 

@@ -49,6 +49,7 @@ JSON under `/api`. Errors are always `{ "error": { "code", "message", "details?"
 | GET | `/api/organizations/:ein` | no | Org plus all filing years. Cache-first (see below). EIN may be `53-0196605` or `530196605`. |
 | POST | `/api/prospects` | yes | `{ein, notes?}`. Saves with status `New`. 409 if already saved. |
 | GET | `/api/prospects?status=&state=&cause=&sort=` | no | `cause` is the cause-area name (e.g. `Human Services`). `sort` is `-savedAt` (default), `revenue`, `-revenue` or `name`. Prospects without revenue data sort last. |
+| GET | `/api/prospects/export.csv` | no | Same filters and sort as the list, downloaded as `scout-shortlist.csv`. Opens cleanly in Excel/Sheets (UTF-8 BOM). Cells beginning with `= + - @` are prefixed with `'` so notes can't run as spreadsheet formulas. |
 | PATCH | `/api/prospects/:id` | yes | `{status?, notes?, website?}`. |
 | GET | `/api/prospects/:id/history` | no | Revenue/expense/asset trend, oldest to newest. |
 | DELETE | `/api/prospects/:id` | yes | 204. |
@@ -75,17 +76,17 @@ Statuses: `New`, `Contacted`, `In conversation`, `Signed`, `Passed`. Any status 
 
 ## Testing
 
-`npm test` runs 23 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
+`npm test` runs 28 tests against a throwaway SQLite file (`prisma/test.db`, real migrations applied):
 
 - Unit: cache hit within TTL, refetch after TTL, stale-on-error, unknown EIN not cached.
 - Client: param mapping, missing fields, de-duplicated years, 404, 429 with `Retry-After`, backoff, timeout and bad JSON mapping.
-- Integration: search, save, update status, list, history, delete end to end. Also auth on every write route, consistent errors, validation, duplicates, filters and sorting.
+- Integration: search, save, update status, list, history, delete end to end. CSV export, with quoting and formula-injection cases. Also auth on every write route, consistent errors, validation, duplicates, filters and sorting.
 
 Tests use a fake ProPublica client, so they're fast and don't hit the network.
 
 ## Known limitations / what I'd do next
 
-- **Stretch goals are not built** (geocoding/map, CSV export, fit score, outreach drafts). I prioritized a solid, tested core.
+- **Stretch goals not built:** geocoding/map, fit score, outreach drafts (CSV export is done). I prioritized a solid, tested core.
 - **Search is not cached.** Fine at club scale. A short in-memory TTL cache would cut repeat queries.
 - **Shortlist sort/filter by revenue happens in memory** after one DB query per prospect for the latest revenue. That's fine for hundreds of prospects, but would want a join or denormalized column beyond that.
 - **Stale data isn't refreshed in the background.** The cache refreshes lazily on the next request after the TTL.
