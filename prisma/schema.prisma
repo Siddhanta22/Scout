@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A nonprofit the club is considering. Descriptive fields are copied from the
+// cached Organization at save time so the shortlist stays readable even if the
+// upstream record changes. `status` is one of New | Contacted |
+// In conversation | Signed | Passed (validated in the API layer, since SQLite
+// has no native enums).
+model Prospect {
+  id        String   @id @default(cuid())
+  ein       String   @unique
+  name      String
+  city      String?
+  state     String?
+  nteeCode  String?
+  causeArea String?
+  website   String?
+  status    String   @default("New")
+  notes     String   @default("")
+  savedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([state])
+}
+
+// One row per EIN. Anchors the cache TTL: even an org with zero filings has a
+// fetchedAt, so we don't re-hit ProPublica on every request for it.
+// (Deviation from the brief's two-entity model; see README.)
+model Organization {
+  ein       String   @id
+  name      String
+  city      String?
+  state     String?
+  nteeCode  String?
+  fetchedAt DateTime
+
+  filings FilingSnapshot[]
+}
+
+// A cached tax year of an organization's 990 financials. Money fields are
+// nullable because filings frequently omit them, and Float because revenue
+// exceeds 32-bit integers for large orgs.
+model FilingSnapshot {
+  id            String   @id @default(cuid())
+  ein           String
+  taxYear       Int
+  totalRevenue  Float?
+  totalExpenses Float?
+  totalAssets   Float?
+  fetchedAt     DateTime
+
+  organization Organization @relation(fields: [ein], references: [ein], onDelete: Cascade)
+
+  @@unique([ein, taxYear])
+}
