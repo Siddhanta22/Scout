@@ -242,7 +242,7 @@ function prospectCard(p) {
       h("li", {},
         h("span", { class: "pts " + (r.points === r.max ? "full" : r.points === 0 ? "zero" : "") }, `${r.points}/${r.max}`),
         h("span", {}, r.text)))));
-  const fitBadge = h("span", { class: "fit f-" + p.fit.label.replace(/ /g, "-"), title: "Score " + p.fit.score + "/100" }, p.fit.label, " · ", p.fit.score);
+  const fitBadge = h("span", { class: "fit f-" + p.fit.label.replace(/ /g, "-"), title: `Fit score: ${p.fit.score} out of 100, based on size, cause and revenue trend. Click "Why this fit?" for the breakdown.` }, p.fit.label, " · ", `${p.fit.score}/100`);
   const whyBtn = h("button", { onclick: () => (why.hidden = !why.hidden) }, "Why this fit?");
 
   saveBtn.onclick = async () => {
